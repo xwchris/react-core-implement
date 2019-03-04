@@ -1,0 +1,26 @@
+{
+  "name": "react-core-implement",
+  "version": "1.0.0",
+  "description": "a simple react core implement include diff and fiber with typescript",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xwchris/react-core-implement.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xwchris/react-core-implement/issues"
+  },
+  "homepage": "https://github.com/xwchris/react-core-implement#readme",
+  "dependencies": {
+    "@babel/core": "^7.3.4",
+    "@babel/plugin-transform-react-jsx": "^7.3.0",
+    "@babel/preset-env": "^7.3.4",
+    "babel-jest": "^24.1.0",
+    "jest": "^24.1.0"
+  }
+}
