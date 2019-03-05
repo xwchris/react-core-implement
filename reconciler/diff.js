@@ -1,5 +1,6 @@
 export const TEXT_NODE = '@react/__text_node';
 
+// todo async setState
 function isClass(type) {
   if (type.isReactComponent) {
     return true;
@@ -25,7 +26,6 @@ export class Component {
   }
   componentWillMount() {}
   componentDidMount() {}
-  componentWillUpdate() {}
   componentWillUnMount() {}
   render() {}
 }
@@ -50,12 +50,12 @@ class CompositeComponent {
     let renderedElement;
     if (isClass(type)) {
       const publicInstance = new type(props);
+      // todo lifecycle
       if (typeof publicInstance.componentWillMount === 'function') {
         publicInstance.componentWillMount();
       }
 
       this.publicInstance = publicInstance;
-      // tip: publicInstance render function required
       renderedElement = publicInstance.render();
     } else {
       renderedElement = type(props);
