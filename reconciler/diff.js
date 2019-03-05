@@ -1,6 +1,9 @@
-export const TEXT_NODE = '@react/__text_node';
+import { RENDERED_INTERNAL_INSTANCE, INTERNAL_INSTANCE, OPERATION } from '../constants';
+import {
+  createNode, appendNode, replaceNode, removeNode,
+  getParentNode, getFirstChildNode, updateNodeAttributes
+} from '../render/dom';
 
-// todo async setState
 function isClass(type) {
   if (type.isReactComponent) {
     return true;
@@ -15,7 +18,7 @@ export class Component {
 
   setState(state) {
     const nextState = Object.assign({}, state);
-    const renderedInternalInstance = this.__rendered_internal_instance;
+    const renderedInternalInstance = this[RENDERED_INTERNAL_INSTANCE];
 
     this.state = nextState;
 
@@ -66,7 +69,7 @@ class CompositeComponent {
     this.renderedInternalInstance = renderedInternalInstance;
 
     if (this.publicInstance) {
-      this.publicInstance.__rendered_internal_instance = renderedInternalInstance;
+      this.publicInstance[RENDERED_INTERNAL_INSTANCE] = renderedInternalInstance;
     }
 
     const node = renderedInternalInstance.mount();
@@ -117,8 +120,9 @@ class CompositeComponent {
     const nextRenderedInternalInstance = instantiateComponent(nextRenderedElement);
     const nextNode = nextRenderedInternalInstance.getHostNode();
 
-    if (prevNode.parentNode) {
-      prevNode.parentNode.replaceChild(nextNode, prevNode);
+    const parentNode = getParentNode(prevNode);
+    if (parentNode) {
+      replaceNode(parentNode, nextNode, prevNode);
     }
   }
 }
@@ -137,35 +141,23 @@ class HostComponent {
   mount() {
     const element = this.currentElement;
 
-    const { type = '', props = {} } = element;
+    const { props = {} } = element;
 
-    let node;
-    if (type === TEXT_NODE) {
-      const textContent = props.textContent || '';
-      node = document.createTextNode(textContent);
-    } else {
-      node = document.createElement(type);
-
-      Object.keys(props).forEach(propName => {
-        if (propName !== 'children') {
-          node.setAttribute(propName, props[propName]);
-        }
-      });
-    }
+    let node = createNode(element);
 
     this.node = node;
 
-    let children = props.children || [];
-    if (!Array.isArray(children)) {
-      children = [children];
+    let elementChildren = props.children || [];
+    if (!Array.isArray(elementChildren)) {
+      elementChildren = [elementChildren];
     }
 
-    const renderedInternalInstanceChildren = children.map(instantiateComponent);
+    const renderedInternalInstanceChildren = elementChildren.map(instantiateComponent);
     const nodeChildren = renderedInternalInstanceChildren.map(child => child.mount());
 
     this.renderedInternalInstanceChildren = renderedInternalInstanceChildren;
 
-    nodeChildren.forEach(nodeChild => node.appendChild(nodeChild));
+    nodeChildren.forEach(nodeChild => appendNode(node, nodeChild));
 
     return node;
   }
@@ -178,7 +170,8 @@ class HostComponent {
       renderedInternalInstanceChildren.forEach(child => {
         child.unmount();
         const childNode = child.getHostNode();
-        node.removeChild(childNode);
+
+        removeNode(node, childNode);
       });
     }
   }
@@ -191,21 +184,7 @@ class HostComponent {
 
     const node = this.node;
 
-    if (type !== TEXT_NODE) {
-      Object.keys(prevProps).forEach(propName => {
-        if (propName !== 'children' && !nextProps.hasOwnProperty(propName)) {
-          node.removeAttribute(propName);
-        }
-      });
-
-      Object.keys(nextProps).forEach(propName => {
-        if (propName !== 'children') {
-          node.setAttribute(propName, nextProps[propName]);
-        }
-      });
-    } else {
-      node.textContent = nextProps.textContent || '';
-    }
+    updateNodeAttributes(node, nextProps, prevProps);
 
     const prevRenderedInternalInstanceChildren = this.renderedInternalInstanceChildren;
     const nextRenderedInternalInstanceChildren = [];
@@ -227,7 +206,7 @@ class HostComponent {
 
         nextRenderedInternalInstanceChildren.push(nextRenderedInternalInstance);
 
-        operationQueue.push({ type: 'ADD', node: nextNode });
+        operationQueue.push({ type: OPERATION.ADD, node: nextNode });
         continue;
       }
 
@@ -241,7 +220,7 @@ class HostComponent {
 
         nextRenderedInternalInstanceChildren.push(nextRenderedInternalInstance);
 
-        operationQueue.push({ type: 'REPLACE', prevNode, nextNode });
+        operationQueue.push({ type: OPERATION.REPLACE, prevNode, nextNode });
         continue;
       }
 
@@ -254,21 +233,21 @@ class HostComponent {
       prevRenderedInternalInstance.unmount();
 
       const prevNode = prevRenderedInternalInstance.getHostNode();
-      operationQueue.push({ type: 'REMOVE', node: prevNode });
+      operationQueue.push({ type: OPERATION.REMOVE, node: prevNode });
     }
 
     while (operationQueue.length > 0) {
       const operation = operationQueue.shift();
 
       switch (operation.type) {
-        case 'ADD':
-          node.appendChild(operation.node);
+        case OPERATION.ADD:
+          appendNode(node, operation.node);
           break;
-        case 'REMOVE':
-          node.removeChild(operation.node);
+        case OPERATION.REMOVE:
+          removeNode(node, operation.node);
           break;
-        case 'REPLACE':
-          node.replaceChild(operation.nextNode, operation.prevNode);
+        case OPERATION.REPLACE:
+          replaceNode(node, operation.nextNode, operation.prevNode);
           break;
       }
     }
@@ -290,29 +269,43 @@ function instantiateComponent(element) {
 }
 
 export function render(element, containerNode) {
-  const internalInstance = instantiateComponent(element);
+  const firstChildNode = getFirstChildNode(containerNode);
 
-  unmountAll(containerNode);
+  if (firstChildNode) {
+    const prevInternalInstance = firstChildNode[INTERNAL_INSTANCE];
+
+    if (prevInternalInstance) {
+      const prevElement = prevInternalInstance.currentElement;
+
+      if (prevElement.type === element.type) {
+        prevInternalInstance.receive(element);
+        return;
+      }
+    }
+
+    unmountAll(containerNode);
+  }
+
+  const internalInstance = instantiateComponent(element);
 
   const node = internalInstance.mount();
 
-  node.__internal_instance = internalInstance;
+  node[INTERNAL_INSTANCE] = internalInstance;
 
-  containerNode.appendChild(node);
+  appendNode(containerNode, node);
 }
 
 export function unmountAll(containerNode) {
-  const firstChild = containerNode.firstChild;
+  const firstChildNode = getFirstChildNode(containerNode);
 
-  if (firstChild) {
-    const rootInternalInstance = firstChild.__internal_instance;
+  if (firstChildNode) {
+    const rootInternalInstance = firstChildNode[INTERNAL_INSTANCE];
 
     if (rootInternalInstance) {
       rootInternalInstance.unmount();
       const rootNode = rootInternalInstance.getHostNode();
-      containerNode.removeChild(rootNode);
-    } else {
-      containerNode.innerHTML = '';
+
+      removeNode(containerNode, rootNode);
     }
   }
 }

@@ -1,5 +1,5 @@
 import { render, Component } from '../../reconciler/diff';
-import { h } from '../../render/createElement';
+import h from '../../render/h';
 
 describe('render test', () => {
   document.body.innerHTML = '<div id="root"></div>';

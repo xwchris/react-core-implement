@@ -1,6 +1,6 @@
-import { TEXT_NODE } from '../reconciler/diff';
+import { TEXT_NODE } from '../constants';
 
-export function h(type, props, ...children) {
+export default function h(type, props, ...children) {
   props = props || {};
 
   children = [].concat(...children)
