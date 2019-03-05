@@ -12,7 +12,19 @@ export class Component {
     this.props = props;
   }
 
+  setState(state) {
+    const nextState = Object.assign({}, state);
+    const renderedInternalInstance = this.__rendered_internal_instance;
+
+    this.state = nextState;
+
+    const nextRenderedElement = this.render();
+    if (renderedInternalInstance) {
+      renderedInternalInstance.receive(nextRenderedElement);
+    }
+  }
   componentWillMount() {}
+  componentDidMount() {}
   componentWillUpdate() {}
   componentWillUnMount() {}
   render() {}
@@ -31,9 +43,7 @@ class CompositeComponent {
     return this.renderedInternalInstance.getHostNode()
   }
 
-  // input: undefined, output: node
   mount() {
-    // tip: element props and type required
     const element = this.currentElement;
     const { type = (() => {}), props = {} } = element;
 
@@ -55,7 +65,17 @@ class CompositeComponent {
 
     this.renderedInternalInstance = renderedInternalInstance;
 
-    return renderedInternalInstance.mount();
+    if (this.publicInstance) {
+      this.publicInstance.__rendered_internal_instance = renderedInternalInstance;
+    }
+
+    const node = renderedInternalInstance.mount();
+
+    if (this.publicInstance && typeof this.publicInstance.componentDidMount === 'function') {
+      this.publicInstance.componentDidMount();
+    }
+
+    return node;
   }
 
   unmount() {
@@ -67,6 +87,39 @@ class CompositeComponent {
     }
 
     renderedInternalInstance.unmount();
+  }
+
+  receive(element) {
+    const prevRenderedInternalInstance = this.renderedInternalInstance;
+    const prevRenderedElement = prevRenderedInternalInstance.currentElement;
+
+    const type = element.type;
+    const nextProps = element.props || {};
+
+    const publicInstance = this.publicInstance;
+    publicInstance.props = nextProps;
+
+    let nextRenderedElement;
+
+    if (isClass(type)) {
+      nextRenderedElement = publicInstance.render();
+    } else {
+      nextRenderedElement = type(nextProps);
+    }
+
+    if (prevRenderedElement.type === nextRenderedElement.type) {
+      renderedInternalInstance.receive(nextRenderedElement);
+      return;
+    }
+
+    const prevNode = prevRenderedInternalInstance.getHostNode();
+
+    const nextRenderedInternalInstance = instantiateComponent(nextRenderedElement);
+    const nextNode = nextRenderedInternalInstance.getHostNode();
+
+    if (prevNode.parentNode) {
+      prevNode.parentNode.replaceChild(nextNode, prevNode);
+    }
   }
 }
 
@@ -83,7 +136,7 @@ class HostComponent {
 
   mount() {
     const element = this.currentElement;
-    // tip: type required to be valid dom type
+
     const { type = '', props = {} } = element;
 
     let node;
@@ -95,7 +148,7 @@ class HostComponent {
 
       Object.keys(props).forEach(propName => {
         if (propName !== 'children') {
-          node.setAttribute(propName, props[propName])
+          node.setAttribute(propName, props[propName]);
         }
       });
     }
@@ -109,6 +162,9 @@ class HostComponent {
 
     const renderedInternalInstanceChildren = children.map(instantiateComponent);
     const nodeChildren = renderedInternalInstanceChildren.map(child => child.mount());
+
+    this.renderedInternalInstanceChildren = renderedInternalInstanceChildren;
+
     nodeChildren.forEach(nodeChild => node.appendChild(nodeChild));
 
     return node;
@@ -124,6 +180,97 @@ class HostComponent {
         const childNode = child.getHostNode();
         node.removeChild(childNode);
       });
+    }
+  }
+
+  receive(element) {
+    const prevProps = this.currentElement.props;
+
+    const type = element.type;
+    const nextProps = element.props || {};
+
+    const node = this.node;
+
+    if (type !== TEXT_NODE) {
+      Object.keys(prevProps).forEach(propName => {
+        if (propName !== 'children' && !nextProps.hasOwnProperty(propName)) {
+          node.removeAttribute(propName);
+        }
+      });
+
+      Object.keys(nextProps).forEach(propName => {
+        if (propName !== 'children') {
+          node.setAttribute(propName, nextProps[propName]);
+        }
+      });
+    } else {
+      node.textContent = nextProps.textContent || '';
+    }
+
+    const prevRenderedInternalInstanceChildren = this.renderedInternalInstanceChildren;
+    const nextRenderedInternalInstanceChildren = [];
+
+    const prevElementChildren = prevProps.children || [];
+    const nextElementChildren = nextProps.children || [];
+
+    const operationQueue = [];
+
+    for (let i = 0; i < nextElementChildren.length; i++) {
+      const prevRenderedInternalInstance = prevRenderedInternalInstanceChildren[i];
+      const prevElement = prevElementChildren[i];
+
+      const nextElement = nextElementChildren[i];
+
+      if (!prevElement) {
+        const nextRenderedInternalInstance = instantiateComponent(nextElement);
+        const nextNode = nextRenderedInternalInstance.getHostNode();
+
+        nextRenderedInternalInstanceChildren.push(nextRenderedInternalInstance);
+
+        operationQueue.push({ type: 'ADD', node: nextNode });
+        continue;
+      }
+
+      const canUpdate = prevElement.type === nextElement.type;
+
+      if (!canUpdate) {
+        const nextRenderedInternalInstance = instantiateComponent(nextElement);
+        const nextNode = nextRenderedInternalInstance.getHostNode();
+
+        const prevNode = prevRenderedInternalInstance.getHostNode();
+
+        nextRenderedInternalInstanceChildren.push(nextRenderedInternalInstance);
+
+        operationQueue.push({ type: 'REPLACE', prevNode, nextNode });
+        continue;
+      }
+
+      prevRenderedInternalInstance.receive(nextElement);
+      nextRenderedInternalInstanceChildren.push(prevRenderedInternalInstance);
+    }
+
+    for (let j = nextElementChildren.length; j < prevElementChildren.length; j++) {
+      const prevRenderedInternalInstance = prevRenderedInternalInstanceChildren[j];
+      prevRenderedInternalInstance.unmount();
+
+      const prevNode = prevRenderedInternalInstance.getHostNode();
+      operationQueue.push({ type: 'REMOVE', node: prevNode });
+    }
+
+    while (operationQueue.length > 0) {
+      const operation = operationQueue.shift();
+
+      switch (operation.type) {
+        case 'ADD':
+          node.appendChild(operation.node);
+          break;
+        case 'REMOVE':
+          node.removeChild(operation.node);
+          break;
+        case 'REPLACE':
+          node.replaceChild(operation.nextNode, operation.prevNode);
+          break;
+      }
     }
   }
 }

@@ -17,13 +17,8 @@ describe('render test', () => {
 
   test('mount element which type is pure function', () => {
     const Container = ({ name }) => (<h1>{`hello ${name}`}</h1>)
-    const element = {
-      type: Container,
-      props: {
-        name: 'xiaowei'
-      },
-      children: [Container]
-    }
+
+    const element = <Container name="xiaowei" />
 
     render(element, $root);
 
@@ -40,17 +35,47 @@ describe('render test', () => {
       }
     }
 
-    const element = {
-      type: Container,
-      props: {
-        name: 'xiaowei'
-      },
-      children: [Container]
-    }
+    const element = <Container name="xiaowei" />
 
     render(element, $root);
 
     const expectHTML = '<h1>hello xiaowei</h1>';
     expect($root.innerHTML).toBe(expectHTML);
   });
+});
+
+describe('setState test', () => {
+  document.body.innerHTML = '<div id="root"></div>';
+  const $root = document.getElementById('root');
+
+  test('state change', () => {
+    class Container extends Component {
+      constructor(props) {
+        super(props);
+
+        this.state = {
+          count: 0
+        }
+      }
+
+      componentDidMount() {
+        this.setState({
+          count: this.state.count + 1
+        })
+      }
+
+      render() {
+        const { count } = this.state;
+
+        return (<h1 id="count">{count}</h1>);
+      }
+    }
+
+    const element = <Container />;
+
+    render(element, $root);
+
+    const expectHTML = '<h1 id="count">1</h1>';
+    expect($root.innerHTML).toBe(expectHTML);
+  })
 })
