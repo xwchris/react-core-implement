@@ -1,7 +1,7 @@
 import { RENDERED_INTERNAL_INSTANCE, INTERNAL_INSTANCE, OPERATION } from '../constants';
 import {
   createNode, appendNode, replaceNode, removeNode,
-  getParentNode, getFirstChildNode, updateNodeAttributes
+  getParentNode, getFirstChildNode, updateNodeAttributes,
 } from '../render/dom';
 
 function isClass(type) {
@@ -11,29 +11,23 @@ function isClass(type) {
   return false;
 }
 
-export class Component {
-  constructor(props) {
-    this.props = props;
-  }
-
-  setState(state) {
-    const nextState = Object.assign({}, state);
-    const renderedInternalInstance = this[RENDERED_INTERNAL_INSTANCE];
-
-    this.state = nextState;
-
-    const nextRenderedElement = this.render();
-    if (renderedInternalInstance) {
-      renderedInternalInstance.receive(nextRenderedElement);
-    }
-  }
-  componentWillMount() {}
-  componentDidMount() {}
-  componentWillUnMount() {}
-  render() {}
+function Component(props) {
+  this.props = props;
 }
 
 Component.isReactComponent = true;
+
+Component.prototype.setState = (state) => {
+  const nextState = Object.assign({}, state);
+  const renderedInternalInstance = this[RENDERED_INTERNAL_INSTANCE];
+
+  this.state = nextState;
+
+  const nextRenderedElement = this.render();
+  if (renderedInternalInstance) {
+    renderedInternalInstance.receive(nextRenderedElement);
+  }
+};
 
 class CompositeComponent {
   constructor(element) {
@@ -43,7 +37,7 @@ class CompositeComponent {
   }
 
   getHostNode() {
-    return this.renderedInternalInstance.getHostNode()
+    return this.renderedInternalInstance.getHostNode();
   }
 
   mount() {
@@ -82,8 +76,8 @@ class CompositeComponent {
   }
 
   unmount() {
-    const publicInstance = this.publicInstance;
-    const renderedInternalInstance = this.renderedInternalInstance;
+    const { publicInstance } = this;
+    const { renderedInternalInstance } = this;
 
     if (publicInstance && typeof publicInstance.componentWillUnMount === 'function') {
       publicInstance.componentWillUnMount();
@@ -96,10 +90,10 @@ class CompositeComponent {
     const prevRenderedInternalInstance = this.renderedInternalInstance;
     const prevRenderedElement = prevRenderedInternalInstance.currentElement;
 
-    const type = element.type;
+    const { type } = element;
     const nextProps = element.props || {};
 
-    const publicInstance = this.publicInstance;
+    const { publicInstance } = this;
     publicInstance.props = nextProps;
 
     let nextRenderedElement;
@@ -111,7 +105,7 @@ class CompositeComponent {
     }
 
     if (prevRenderedElement.type === nextRenderedElement.type) {
-      renderedInternalInstance.receive(nextRenderedElement);
+      prevRenderedInternalInstance.receive(nextRenderedElement);
       return;
     }
 
@@ -143,7 +137,7 @@ class HostComponent {
 
     const { props = {} } = element;
 
-    let node = createNode(element);
+    const node = createNode(element);
 
     this.node = node;
 
@@ -163,11 +157,11 @@ class HostComponent {
   }
 
   unmount() {
-    const renderedInternalInstanceChildren = this.renderedInternalInstanceChildren;
-    const node = this.node;
+    const { renderedInternalInstanceChildren } = this;
+    const { node } = this;
 
     if (renderedInternalInstanceChildren) {
-      renderedInternalInstanceChildren.forEach(child => {
+      renderedInternalInstanceChildren.forEach((child) => {
         child.unmount();
         const childNode = child.getHostNode();
 
@@ -178,11 +172,8 @@ class HostComponent {
 
   receive(element) {
     const prevProps = this.currentElement.props;
-
-    const type = element.type;
     const nextProps = element.props || {};
-
-    const node = this.node;
+    const { node } = this;
 
     updateNodeAttributes(node, nextProps, prevProps);
 
@@ -239,16 +230,12 @@ class HostComponent {
     while (operationQueue.length > 0) {
       const operation = operationQueue.shift();
 
-      switch (operation.type) {
-        case OPERATION.ADD:
-          appendNode(node, operation.node);
-          break;
-        case OPERATION.REMOVE:
-          removeNode(node, operation.node);
-          break;
-        case OPERATION.REPLACE:
-          replaceNode(node, operation.nextNode, operation.prevNode);
-          break;
+      if (operation.type === OPERATION.ADD) {
+        appendNode(node, operation.node);
+      } else if (operation.type === OPERATION.REMOVE) {
+        removeNode(node, operation.node);
+      } else if (operation.type === OPERATION.REPLACE) {
+        replaceNode(node, operation.nextNode, operation.prevNode);
       }
     }
   }

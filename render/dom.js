@@ -1,13 +1,13 @@
-import { TEXT_NODE } from "../constants";
+import { TEXT_NODE } from '../constants';
 
 export function createNode(element) {
-  let type = element.type || '';
-  let props = element.props || {};
+  const type = element.type || '';
+  const props = element.props || {};
 
   let node;
 
   if (typeof type !== 'string' || typeof props !== 'object') {
-    return;
+    return null;
   }
 
   if (type === TEXT_NODE) {
@@ -24,7 +24,7 @@ export function createNode(element) {
 
 export function appendNode(parentNode, childNode) {
   if (!(parentNode instanceof Node) || !(childNode instanceof Node)) {
-    return;
+    return null;
   }
 
   parentNode.appendChild(childNode);
@@ -33,7 +33,7 @@ export function appendNode(parentNode, childNode) {
 
 export function removeNode(parentNode, childNode) {
   if (!(parentNode instanceof Node) || !(childNode instanceof Node)) {
-    return;
+    return null;
   }
 
   parentNode.removeChild(childNode);
@@ -42,7 +42,7 @@ export function removeNode(parentNode, childNode) {
 
 export function replaceNode(parentNode, newNode, oldNode) {
   if (!(parentNode instanceof Node) || !(newNode instanceof Node) || !(oldNode instanceof Node)) {
-    return;
+    return null;
   }
 
   parentNode.replaceChild(newNode, oldNode);
@@ -51,7 +51,7 @@ export function replaceNode(parentNode, newNode, oldNode) {
 
 export function getParentNode(node) {
   if (!(node instanceof Node)) {
-    return;
+    return null;
   }
 
   return node.parentNode;
@@ -59,7 +59,7 @@ export function getParentNode(node) {
 
 export function getFirstChildNode(node) {
   if (!(node instanceof Node)) {
-    return;
+    return null;
   }
 
   return node.firstChild;
@@ -87,8 +87,8 @@ const attributeHandler = {
   // 处理class属性
   className: (node, value) => {
     node.setAttribute('class', value);
-  }
-}
+  },
+};
 
 const isListener = propName => propName.startsWith('on');
 const isStyle = propName => propName === 'style';
@@ -106,7 +106,7 @@ export function setNodeAttributes(node, props) {
     return;
   }
 
-  Object.keys(props).forEach(propName => {
+  Object.keys(props).forEach((propName) => {
     const value = props[propName];
 
     if (isListener(propName)) {
@@ -118,7 +118,7 @@ export function setNodeAttributes(node, props) {
     } else if (!isChildren(propName)) {
       node.setAttribute(propName, value);
     }
-  })
+  });
 }
 
 export function updateNodeAttributes(node, newProps, oldProps) {
@@ -130,7 +130,7 @@ export function updateNodeAttributes(node, newProps, oldProps) {
     return;
   }
 
-  if (!node instanceof HTMLElement) {
+  if (!(node instanceof HTMLElement)) {
     return;
   }
 
@@ -142,21 +142,21 @@ export function updateNodeAttributes(node, newProps, oldProps) {
   const willSetProps = {};
 
   Object.keys(oldProps)
-    .filter(propName => !isChildren(propName) && !newProps.hasOwnProperty(propName))
-    .forEach(propName => willRemoveProps[propName] = oldProps[propName])
+    .filter(propName => !isChildren(propName) && propName in newProps)
+    .forEach((propName) => { willRemoveProps[propName] = oldProps[propName]; });
 
   removeNodeAttributes(node, willRemoveProps);
 
 
   Object.keys(newProps)
-  .filter(propName => !isChildren(propName))
-  .forEach(propName => willSetProps[propName] = newProps[propName])
+    .filter(propName => !isChildren(propName))
+    .forEach((propName) => { willSetProps[propName] = newProps[propName]; });
 
   setNodeAttributes(node, willSetProps);
 }
 
 export function removeNodeAttributes(node, props) {
-  if (!node instanceof HTMLElement) {
+  if (!(node instanceof HTMLElement)) {
     return;
   }
 
@@ -166,7 +166,7 @@ export function removeNodeAttributes(node, props) {
     return;
   }
 
-  Object.keys(props).forEach(propName => {
+  Object.keys(props).forEach((propName) => {
     const value = props[propName];
 
     if (isListener(propName)) {
@@ -174,5 +174,5 @@ export function removeNodeAttributes(node, props) {
     } else if (!isChildren(propName)) {
       node.removeAttribute(propName, value);
     }
-  })
+  });
 }
