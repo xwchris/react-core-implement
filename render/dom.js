@@ -65,14 +65,20 @@ export function getFirstChildNode(node) {
   return node.firstChild;
 }
 
+function eventProxy(e) {
+  return this._listener[e.type](e);
+}
+
 const attributeHandler = {
   // 处理事件
   listener: (node, eventName, eventFunc) => {
-    node.addEventListener(eventName, eventFunc);
+    node.addEventListener(eventName, eventProxy);
+    node._listener = node._listener || {};
+    node._listener[eventName] = eventFunc;
   },
 
-  unlistener: (node, eventName, eventFunc) => {
-    node.removeEventListener(eventName, eventFunc);
+  unlistener: (node, eventName) => {
+    node.removeEventListener(eventName, eventProxy);
   },
 
   // 处理样式属性
@@ -110,6 +116,7 @@ export function setNodeAttributes(node, props) {
     const value = props[propName];
 
     if (isListener(propName)) {
+      attributeHandler.unlistener(node, propName.replace(/^on/, '').toLowerCase());
       attributeHandler.listener(node, propName.replace(/^on/, '').toLowerCase(), value);
     } else if (isStyle(propName)) {
       attributeHandler.style(node, value);
@@ -141,12 +148,13 @@ export function updateNodeAttributes(node, newProps, oldProps) {
   const willRemoveProps = {};
   const willSetProps = {};
 
+  const hasProperty = (obj, propName) => !Object.prototype.hasOwnProperty.call(obj, propName);
+
   Object.keys(oldProps)
-    .filter(propName => !isChildren(propName) && propName in newProps)
+    .filter(propName => !isChildren(propName) && hasProperty(newProps, propName))
     .forEach((propName) => { willRemoveProps[propName] = oldProps[propName]; });
 
   removeNodeAttributes(node, willRemoveProps);
-
 
   Object.keys(newProps)
     .filter(propName => !isChildren(propName))
@@ -170,7 +178,7 @@ export function removeNodeAttributes(node, props) {
     const value = props[propName];
 
     if (isListener(propName)) {
-      attributeHandler.unlistener(node, propName.replace(/^on/, '').toLowerCase(), value);
+      attributeHandler.unlistener(node, propName.replace(/^on/, '').toLowerCase());
     } else if (!isChildren(propName)) {
       node.removeAttribute(propName, value);
     }

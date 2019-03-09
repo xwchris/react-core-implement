@@ -1,5 +1,6 @@
 import {
-  HOST_COMPONENT, COMPOSITE_COMPONENT, HOST_ROOT, OPERATION, ENOUGH_TIME, ROOT_FIBER,
+  HOST_COMPONENT, COMPOSITE_COMPONENT, HOST_ROOT, OPERATION,
+  ENOUGH_TIME, ROOT_FIBER, INSTANCE_INNER_FIBER,
 } from '../constants';
 
 import {
@@ -23,6 +24,17 @@ function render(elements, containerDom) {
     tag: HOST_ROOT,
     dom: containerDom,
     props: { children: elements },
+  });
+
+  requestIdleCallback(performWork);
+}
+
+function updateComponent(instance, partialState) {
+  taskQueue.push({
+    tag: HOST_COMPONENT,
+    instance,
+    partialState,
+    props: instance.props,
   });
 
   requestIdleCallback(performWork);
@@ -53,15 +65,38 @@ function workLoop(deadline) {
 function resetNextUnitWork() {
   const task = taskQueue.shift();
 
-  if (task.tag === HOST_ROOT) {
-    const oldRootFiber = task.dom[ROOT_FIBER];
+  if (task == null) {
+    return null;
+  }
 
+  if (task.tag === HOST_ROOT) {
     nextUnitWork = {
       tag: HOST_ROOT,
       statNode: task.dom,
       props: task.props,
+      alternate: task.dom[ROOT_FIBER],
+    };
+  } else {
+    const currentFiber = task.instance[INSTANCE_INNER_FIBER];
+    const getRootFiber = (fiber) => {
+      if (fiber.tag !== HOST_ROOT) {
+        fiber = fiber.parent;
+      }
+      return fiber;
+    };
+
+    const oldRootFiber = getRootFiber(currentFiber);
+
+    nextUnitWork = {
+      tag: HOST_ROOT,
+      props: oldRootFiber.props,
+      statNode: oldRootFiber.statNode,
       alternate: oldRootFiber,
     };
+
+    if (task.partialState) {
+      currentFiber.partialState = task.partialState;
+    }
   }
   return nextUnitWork;
 }
@@ -94,6 +129,10 @@ function beginWork(fiber) {
 }
 
 function completeWork(fiber) {
+  if (fiber.tag === COMPOSITE_COMPONENT && fiber.statNode != null) {
+    fiber.statNode[INSTANCE_INNER_FIBER] = fiber;
+  }
+
   if (fiber.parent) {
     const childEffects = fiber.effects || [];
     const parentEffects = fiber.parent.effects || [];
@@ -104,24 +143,31 @@ function completeWork(fiber) {
 }
 
 function workInCompositeComponent(fiber) {
-  // alternate fiber
   const {
-    type, props, alternate, statNode,
+    type, props, alternate, statNode, partialState,
   } = fiber;
-  const isClassComponent = type.isReactComponent;
 
-  if (alternate && alternate.props === props) {
+  if (alternate && alternate.props === props && partialState == null) {
     cloneChildrenFiber(fiber);
     return;
   }
 
   let instance = statNode;
-  if (isClassComponent && instance == null) {
-    instance = new type(props);
-  }
 
+  // 类组件
+  const isClassComponent = type.isReactComponent;
   if (isClassComponent) {
+    if (instance == null) {
+      instance = new type(props);
+
+      // 用来标记组件是否是第一次创建
+      instance.isFirstCreate = true;
+    } else {
+      instance.isFirstCreate = false;
+    }
+
     instance.props = props;
+    instance.state = Object.assign({}, instance.state, alternate ? alternate.partialState : null);
   }
 
   fiber.statNode = instance;
@@ -144,22 +190,26 @@ function workInHostComponent(fiber) {
 function reconcileChildren(fiber, elements) {
   elements = elements == null ? [] : (Array.isArray(elements) ? elements : [elements]);
 
-  const oldChildFiber = fiber.child;
+  let oldChildFiber = fiber.alternate ? fiber.alternate.child : null;
   let newChildFiber = null;
 
   let index = 0;
 
-  if (index < elements.length || oldChildFiber != null) {
+  while (index < elements.length || oldChildFiber != null) {
     const prevFiber = newChildFiber;
     const element = elements[index];
 
-    newChildFiber = {
-      tag: typeof element.type === 'function' ? COMPOSITE_COMPONENT : HOST_COMPONENT,
-      type: element.type,
-      props: element.props,
-      parent: fiber,
-      alternate: oldChildFiber,
-    };
+    if (element != null) {
+      newChildFiber = {
+        tag: typeof element.type === 'function' ? COMPOSITE_COMPONENT : HOST_COMPONENT,
+        type: element.type,
+        props: element.props,
+        parent: fiber,
+        alternate: oldChildFiber,
+      };
+    } else {
+      newChildFiber = null;
+    }
 
     if (oldChildFiber == null && element != null) {
       newChildFiber.effectTag = OPERATION.ADD;
@@ -171,10 +221,20 @@ function reconcileChildren(fiber, elements) {
         fiber.effects = fiber.effects || [];
         fiber.effects.push(oldChildFiber);
       } else if (element != null && oldChildFiber.type !== newChildFiber.type) {
-        fiber.effectTag = OPERATION.REPLACE;
-      } else if (element != null && oldChildFiber.props !== newChildFiber.props) {
-        fiber.effectTag = OPERATION.UPDATE;
+        newChildFiber.effectTag = OPERATION.REPLACE;
+      } else if (
+        element != null
+        && (oldChildFiber.props !== newChildFiber.props
+          || oldChildFiber.partialState != null)
+      ) {
+        newChildFiber.partialState = oldChildFiber.partialState;
+        newChildFiber.statNode = oldChildFiber.statNode;
+        newChildFiber.effectTag = OPERATION.UPDATE;
       }
+    }
+
+    if (oldChildFiber) {
+      oldChildFiber = oldChildFiber.sibling;
     }
 
     if (index === 0) {
@@ -237,6 +297,13 @@ function commitAllWork(rootFiber) {
         }
       }
     }
+
+    const fiberInstance = fiber.type.isReactComponent ? fiber.statNode : null;
+
+    // life cycle: componentDidMount
+    if (fiberInstance && fiberInstance.isFirstCreate && typeof fiberInstance.componentDidMount === 'function') {
+      fiberInstance.componentDidMount();
+    }
   }
 }
 
@@ -255,10 +322,17 @@ function downwardUtilNodeFiber(fiber) {
   return fiber;
 }
 
+// Component
 function Component(props) {
   this.props = props;
 }
 
 Component.isReactComponent = true;
+
+Component.prototype = Object.assign({}, Component.prototype, {
+  setState: function setState(nextState) {
+    updateComponent(this, nextState);
+  },
+});
 
 export { render, Component };

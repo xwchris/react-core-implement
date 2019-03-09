@@ -70,10 +70,6 @@ describe('setState test', () => {
         })
       }
 
-      componentWillUpdate(nextProps, nextState) {
-        console.log('next', this.state, nextState);
-      }
-
       render() {
         const { count } = this.state;
 

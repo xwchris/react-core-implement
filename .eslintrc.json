@@ -19,6 +19,7 @@
         "react"
     ],
     "rules": {
+        "no-underscore-dangle":"off",
         "no-use-before-define":"off",
         "no-param-reassign":"off",
         "new-cap":"off",

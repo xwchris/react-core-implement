@@ -4,31 +4,6 @@ import {
   getParentNode, getFirstChildNode, updateNodeAttributes,
 } from '../render/dom';
 
-function isClass(type) {
-  if (type.isReactComponent) {
-    return true;
-  }
-  return false;
-}
-
-export function Component(props) {
-  this.props = props;
-}
-
-Component.isReactComponent = true;
-
-Component.prototype.setState = function setState(state) {
-  const nextState = Object.assign({}, state);
-  const renderedInternalInstance = this[RENDERED_INTERNAL_INSTANCE];
-
-  this.state = nextState;
-
-  const nextRenderedElement = this.render();
-  if (renderedInternalInstance) {
-    renderedInternalInstance.receive(nextRenderedElement);
-  }
-};
-
 class CompositeComponent {
   constructor(element) {
     this.currentElement = element;
@@ -47,11 +22,6 @@ class CompositeComponent {
     let renderedElement;
     if (isClass(type)) {
       const publicInstance = new type(props);
-      // todo lifecycle
-      if (typeof publicInstance.componentWillMount === 'function') {
-        publicInstance.componentWillMount();
-      }
-
       this.publicInstance = publicInstance;
       renderedElement = publicInstance.render();
     } else {
@@ -76,13 +46,7 @@ class CompositeComponent {
   }
 
   unmount() {
-    const { publicInstance } = this;
     const { renderedInternalInstance } = this;
-
-    if (publicInstance && typeof publicInstance.componentWillUnMount === 'function') {
-      publicInstance.componentWillUnMount();
-    }
-
     renderedInternalInstance.unmount();
   }
 
@@ -255,7 +219,22 @@ function instantiateComponent(element) {
   return internalInstance;
 }
 
-export function render(element, containerNode) {
+function unmountAll(containerNode) {
+  const firstChildNode = getFirstChildNode(containerNode);
+
+  if (firstChildNode) {
+    const rootInternalInstance = firstChildNode[INTERNAL_INSTANCE];
+
+    if (rootInternalInstance) {
+      rootInternalInstance.unmount();
+      const rootNode = rootInternalInstance.getHostNode();
+
+      removeNode(containerNode, rootNode);
+    }
+  }
+}
+
+function render(element, containerNode) {
   const firstChildNode = getFirstChildNode(containerNode);
 
   if (firstChildNode) {
@@ -282,17 +261,33 @@ export function render(element, containerNode) {
   appendNode(containerNode, node);
 }
 
-export function unmountAll(containerNode) {
-  const firstChildNode = getFirstChildNode(containerNode);
-
-  if (firstChildNode) {
-    const rootInternalInstance = firstChildNode[INTERNAL_INSTANCE];
-
-    if (rootInternalInstance) {
-      rootInternalInstance.unmount();
-      const rootNode = rootInternalInstance.getHostNode();
-
-      removeNode(containerNode, rootNode);
-    }
+function isClass(type) {
+  if (type.isReactComponent) {
+    return true;
   }
+  return false;
 }
+
+function Component(props) {
+  this.props = props;
+}
+
+Component.isReactComponent = true;
+
+Component.prototype = Object.assign({}, Component.prototype, {
+  setState: function setState(state) {
+    const nextState = Object.assign({}, state);
+    const renderedInternalInstance = this[RENDERED_INTERNAL_INSTANCE];
+
+    this.state = nextState;
+
+    const nextRenderedElement = this.render();
+    console.log(this.state);
+
+    if (renderedInternalInstance) {
+      renderedInternalInstance.receive(nextRenderedElement);
+    }
+  },
+});
+
+export { render, Component };

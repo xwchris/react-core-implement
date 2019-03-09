@@ -25,3 +25,5 @@ export const HOST_ROOT = `${prefix}host_root`;
 export const ENOUGH_TIME = 1;
 
 export const ROOT_FIBER = `${prefix}root_fiber`;
+
+export const INSTANCE_INNER_FIBER = `${prefix}instance_inner_fiber`;
