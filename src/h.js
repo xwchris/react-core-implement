@@ -1,4 +1,4 @@
-import { TEXT_NODE } from '../constants';
+import { TEXT_NODE } from './constants';
 
 export default function h(type, props, ...children) {
   props = props || {};

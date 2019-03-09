@@ -4,20 +4,30 @@
 
 # react-core-implement
 
-## 目标
-该仓库主要目的用于学习react的核心实现原理，主要包括`react reconciler`的`diff`和`fiber`算法的理解和实现。
+> 该仓库的目标是学习和理解React的核心实现原理，包括React中的`reconcile`算法的实现，以及渲染器的实现
 
-## Diff实现
+## 如何开始
+快速查看实现后效果，你可以使用如下命令
+
+```bash
+git clone git@github.com:xwchris/react-core-implement.git
+
+// 在跟项目根目录执行
+npm i && npm start
+```
+
+然后你就能在浏览器的中使用`http://localhost:8080/`来查看效果
+
+## 预备知识
 待完成...
 
-## Fiber实现
-待实现...
+## diff核心
+待完成...
 
-## 任务规划
-- [x] diff算法实现
-- [x] render dom实现
-- [ ] fiber算法实现
-- [ ] 组件完全[异步update & 生命周期]
+## fiber核心
+待完成...
+
+## 未实现的部分
 
 ## 参考资料
 

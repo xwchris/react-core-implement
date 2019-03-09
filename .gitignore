@@ -1,6 +1,2 @@
-dist
 public
 .vscode
-index.html
-index.js
-webpack.config.js
