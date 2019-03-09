@@ -1,0 +1,5 @@
+dist
+public
+.vscode
+index.html
+webpack.config.js

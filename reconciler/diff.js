@@ -11,13 +11,13 @@ function isClass(type) {
   return false;
 }
 
-function Component(props) {
+export function Component(props) {
   this.props = props;
 }
 
 Component.isReactComponent = true;
 
-Component.prototype.setState = (state) => {
+Component.prototype.setState = function setState(state) {
   const nextState = Object.assign({}, state);
   const renderedInternalInstance = this[RENDERED_INTERNAL_INSTANCE];
 

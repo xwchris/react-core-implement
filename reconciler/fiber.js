@@ -10,6 +10,14 @@ const taskQueue = [];
 let nextUnitWork = null;
 let pendingCommit = null;
 
+if (global.requestIdleCallback == null) {
+  global.requestIdleCallback = (func) => {
+    func({
+      timeRemaining: () => 100,
+    });
+  };
+}
+
 function render(elements, containerDom) {
   taskQueue.push({
     tag: HOST_ROOT,
@@ -21,19 +29,21 @@ function render(elements, containerDom) {
 }
 
 function performWork(deadline) {
-  workLoop();
+  workLoop(deadline);
 
-  if (nextUnitWork && deadline.timeRemaining() > ENOUGH_TIME) {
+  if (nextUnitWork || taskQueue.length > 0) {
     requestIdleCallback(performWork);
   }
 }
 
-function workLoop() {
+function workLoop(deadline) {
   if (nextUnitWork == null) {
     nextUnitWork = resetNextUnitWork();
   }
 
-  nextUnitWork = performUnitWork(nextUnitWork);
+  if (nextUnitWork && deadline.timeRemaining() > ENOUGH_TIME) {
+    nextUnitWork = performUnitWork(nextUnitWork);
+  }
 
   if (pendingCommit) {
     commitAllWork(pendingCommit);
@@ -53,6 +63,7 @@ function resetNextUnitWork() {
       alternate: oldRootFiber,
     };
   }
+  return nextUnitWork;
 }
 
 function performUnitWork(fiber) {
@@ -86,7 +97,7 @@ function completeWork(fiber) {
   if (fiber.parent) {
     const childEffects = fiber.effects || [];
     const parentEffects = fiber.parent.effects || [];
-    fiber.parentEffects = [...parentEffects, ...childEffects, fiber.effectTag];
+    fiber.parent.effects = [...parentEffects, ...childEffects, fiber];
   } else {
     pendingCommit = fiber;
   }
@@ -120,7 +131,12 @@ function workInCompositeComponent(fiber) {
 }
 
 function workInHostComponent(fiber) {
-  const { props } = fiber;
+  const { props = {} } = fiber;
+
+  if (fiber.statNode == null) {
+    fiber.statNode = createNode({ type: fiber.type, props: fiber.props });
+  }
+
   const childrenElements = props.children;
   reconcileChildren(fiber, childrenElements);
 }
@@ -138,7 +154,7 @@ function reconcileChildren(fiber, elements) {
     const element = elements[index];
 
     newChildFiber = {
-      tag: HOST_COMPONENT,
+      tag: typeof element.type === 'function' ? COMPOSITE_COMPONENT : HOST_COMPONENT,
       type: element.type,
       props: element.props,
       parent: fiber,
@@ -203,7 +219,7 @@ function commitAllWork(rootFiber) {
 
     if (nodeFiber) {
       const parentNode = parentNodeFiber.statNode;
-      const node = nodeFiber.statNode || createNode(nodeFiber.type);
+      const node = nodeFiber.statNode;
 
       if (fiber.effectTag === OPERATION.ADD) {
         appendNode(parentNode, node);

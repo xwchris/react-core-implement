@@ -21,7 +21,9 @@
     "@babel/plugin-transform-react-jsx": "^7.3.0",
     "@babel/preset-env": "^7.3.4",
     "babel-jest": "^24.1.0",
-    "jest": "^24.1.0"
+    "babel-loader": "^8.0.5",
+    "jest": "^24.1.0",
+    "webpack": "^4.29.6"
   },
   "devDependencies": {
     "eslint": "^5.15.1",
