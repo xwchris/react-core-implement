@@ -12,11 +12,10 @@
 ```bash
 git clone git@github.com:xwchris/react-core-implement.git
 
-// 在跟项目根目录执行
 npm i && npm start
 ```
 
-然后你就能在浏览器的中使用`http://localhost:8080/`来查看效果
+然后你就能在浏览器的中使用`http://localhost:8080/`地址来查看效果
 
 ## 预备知识
 待完成...
