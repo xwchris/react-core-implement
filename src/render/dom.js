@@ -1,5 +1,12 @@
+/**
+ * 浏览器渲染器
+ *
+ * 用于dom渲染的各种操作
+ */
+
 import { TEXT_NODE } from '../constants';
 
+// 创建dom节点函数
 export function createNode(element) {
   const type = element.type || '';
   const props = element.props || {};
@@ -10,6 +17,8 @@ export function createNode(element) {
     return null;
   }
 
+  // Text节点使用createTextNode函数进行创建
+  // 其他HTMLElement节点使用creatElement节点进行创建
   if (type === TEXT_NODE) {
     node = document.createTextNode(props.textContent || '');
   } else {
@@ -22,6 +31,7 @@ export function createNode(element) {
   return node;
 }
 
+// 追加dom节点函数
 export function appendNode(parentNode, childNode) {
   if (!(parentNode instanceof Node) || !(childNode instanceof Node)) {
     return null;
@@ -31,6 +41,7 @@ export function appendNode(parentNode, childNode) {
   return parentNode;
 }
 
+// 移除dom节点函数
 export function removeNode(parentNode, childNode) {
   if (!(parentNode instanceof Node) || !(childNode instanceof Node)) {
     return null;
@@ -40,6 +51,7 @@ export function removeNode(parentNode, childNode) {
   return parentNode;
 }
 
+// 替代dom节点函数
 export function replaceNode(parentNode, newNode, oldNode) {
   if (!(parentNode instanceof Node) || !(newNode instanceof Node) || !(oldNode instanceof Node)) {
     return null;
@@ -49,6 +61,7 @@ export function replaceNode(parentNode, newNode, oldNode) {
   return parentNode;
 }
 
+// 获取dom节点父节点
 export function getParentNode(node) {
   if (!(node instanceof Node)) {
     return null;
@@ -57,6 +70,7 @@ export function getParentNode(node) {
   return node.parentNode;
 }
 
+// 获取第一个孩子dom节点
 export function getFirstChildNode(node) {
   if (!(node instanceof Node)) {
     return null;
@@ -65,10 +79,12 @@ export function getFirstChildNode(node) {
   return node.firstChild;
 }
 
+// 事件代理 为了方便进行事件绑定和取消绑定
 function eventProxy(e) {
   return this._listener[e.type](e);
 }
 
+// 属性处理器
 const attributeHandler = {
   // 处理事件
   listener: (node, eventName, eventFunc) => {
@@ -96,11 +112,13 @@ const attributeHandler = {
   },
 };
 
+// 各种属性判断函数
 const isListener = propName => propName.startsWith('on');
 const isStyle = propName => propName === 'style';
 const isClass = propName => propName === 'class' || propName === 'className';
 const isChildren = propName => propName === 'children';
 
+// 设置节点属性
 export function setNodeAttributes(node, props) {
   if (!(node instanceof HTMLElement)) {
     return;
@@ -128,6 +146,7 @@ export function setNodeAttributes(node, props) {
   });
 }
 
+// 更新节点属性
 export function updateNodeAttributes(node, newProps, oldProps) {
   newProps = newProps || {};
   oldProps = oldProps || {};
@@ -163,6 +182,7 @@ export function updateNodeAttributes(node, newProps, oldProps) {
   setNodeAttributes(node, willSetProps);
 }
 
+// 移除节点属性
 export function removeNodeAttributes(node, props) {
   if (!(node instanceof HTMLElement)) {
     return;
